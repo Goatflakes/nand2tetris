@@ -43,4 +43,45 @@ CHIP ALU {
 
     PARTS:
    // Put you code here:
+
+   // if(zx), replace x with 0 
+   Mux16(a=x, b=false, sel=zx, out=x1);
+   // compute the Not of the new x
+   Not16(in=x1, out=notx1);
+   // if(nx), select the negated new x, otherwise x
+   Mux16(a=x1, b=notx1, sel=nx, out=x2);
+   
+   // do the same as above with y
+   Mux16(a=y, b=false, sel=zy, out=y1);
+   Not16(in=y1, out=noty1);
+   Mux16(a=y1, b=noty1, sel=ny, out=y2);
+   
+   // compute the sum of the final x and y input
+   Add16(a=x2, b=y2, out=sumx2y2);
+   
+   // compute the bitwise and of the final x and y input
+   And16(a=x2, b=y2, out=andx2y2);
+   
+   // select the and or the add result as the intermediate to output
+   Mux16(a=andx2y2, b=sumx2y2, sel=f, out=out1);
+   
+   // compute the not of the intermediate output
+   Not16(in=out1, out=notout1);
+   
+   // select either the intermediate output or Not the intermediate output
+   Mux16(a=out1, b=notout1, sel=no, out=out2);
+   
+   // Output out2, incredibly hackish, is there an identity "chip"?
+   And16(a=out2, b=true, out=out);
+   
+   // Set the output flags
+   
+   // Uses Or16Way.hdl from the current folder
+   Or16Way(in=out2, out=notzr);
+   Not(in=notzr, out=zr);
+   
+   // how the hell to just say ng = out2[15]? Again, incredibly hackish
+   // Also this assumes every number is 16 bit 2s compliment
+   // Uses MostSignificantBit16.hdl from the current folder
+   MostSignificantBit16(in=out2, out=ng);
 }

@@ -1,0 +1,27 @@
+/**
+ * 16-way Or: 
+ * out = (in[0] or in[1] or ... or in[15])
+ */
+
+CHIP Or16Way {
+    IN in[16];
+    OUT out;
+
+    PARTS:
+    // Put your code here:
+	Or(a=in[0],       b=in[1],         out=Or0o1);
+	Or(a=in[2],       b=in[3],         out=Or2o3);
+	Or(a=in[4],       b=in[5],         out=Or4o5);
+	Or(a=in[6],       b=in[7],         out=Or6o7);
+	Or(a=in[8],       b=in[9],         out=Or8o9);
+	Or(a=in[10],      b=in[11],        out=Or10o11);
+	Or(a=in[12],      b=in[13],        out=Or12o13);
+	Or(a=in[14],      b=in[15],        out=Or14o15);
+	Or(a=Or0o1,       b=Or2o3,         out=Or0o1o2o3);
+	Or(a=Or4o5,       b=Or6o7,         out=Or4o5o6o7);
+	Or(a=Or8o9,       b=Or10o11,       out=Or8o9o10o11);
+	Or(a=Or12o13,     b=Or14o15,       out=Or12o13o14o15);
+	Or(a=Or0o1o2o3,   b=Or4o5o6o7,     out=Or0o1o2o3o4o5o6o7);
+	Or(a=Or8o9o10o11, b=Or12o13o14o15, out=Or8o9o10o11o12o13o14o15);
+	Or(a=Or0o1o2o3o4o5o6o7, b=Or8o9o10o11o12o13o14o15, out=out);
+}

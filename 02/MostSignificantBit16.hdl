@@ -1,0 +1,13 @@
+/**
+ * Return the Most Significant Bit of a 16 bit word: 
+ * out = in[15]
+ */
+
+CHIP MostSignificantBit16 {
+    IN in[16];
+    OUT out;
+
+    PARTS:
+    // Put your code here:
+	And(a = in[15], b=true, out=out);
+}
