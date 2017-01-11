@@ -17,4 +17,23 @@ CHIP PC {
 
     PARTS:
     // Put your code here:
+	
+	// Register to hold the PC state, will load the value
+	// presented if _loadpc_ was calculated to be true,
+	// otherwise will retain its value.
+	Register(in=pcin, load=loadpc, out=out, out=pcout);
+	
+	// Calculate what the incremented PC would be
+	Inc16(in=pcout,out=incpc);
+	
+	// Determine whether to actually load the value presented to the PC
+	Or(a=reset,   b=load, out=loadpc1);
+	Or(a=loadpc1, b=inc,  out=loadpc);
+	
+	// Present either _in_ or the incremented PC to the next decision 
+	Mux16(a=incpc, b=in, sel=load, out=pcin1);
+	
+	// Present 0 (16-bits of false) if reset=true, otherwise present
+	// either _in_ or the incremented PC, which ever was chosen.
+	Mux16(a=pcin1, b=false, sel=reset, out=pcin);
 }
