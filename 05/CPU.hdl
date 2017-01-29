@@ -40,4 +40,142 @@ CHIP CPU {
 
     PARTS:
     // Put your code here:
+	
+	// I have numbered the "c" control bits from the
+	// "Hack CPU Implementation diagram" as cb1-8, referring to
+	// the diagram left to right, top to bottom, to avoid confusion
+	// with the c1-c6 from the instruction format of the c instruction
+	
+	// save the destination bits and jump bits for when the current A & D
+	// register (and combinatorial functions of them) have stabilized. But only
+	// do so if the current instruction type is C, otherwise they MUST be
+	// ignored
+	
+	// d1
+	And(a=instruction[15], b=instruction[5], out=aDest);
+	DFF(in=aDest, out=d1);
+	// d2
+	And(a=instruction[15], b=instruction[4], out=dDest);
+	DFF(in=dDest, out=d2);
+	// d3 needs to be stored, writeM
+	And(a=instruction[15], b=instruction[3], out=mDest);
+	DFF(in=mDest, out=d3, out=writeM);
+	
+	// same for the j bits, ignore them if instruction is A type
+	// j1
+	And(a=instruction[15], b=instruction[2], out=jmp1);
+	DFF(in=jmp1, out=j1);
+	// j2
+	And(a=instruction[15], b=instruction[1], out=jmp2);
+	DFF(in=jmp2, out=j2);
+	// j3
+	And(a=instruction[15], b=instruction[0], out=jmp3);
+	DFF(in=jmp3, out=j3);
+	
+	// same for a bit in instruction
+	And(a=instruction[15], b=instruction[12], out=abit);
+	DFF(in=abit, out=a);
+	
+	// cb1=instruction[15]
+	Mux16(a=instruction, b=ALUout, sel=instruction[15], out=aRegIn);
+
+	// the A register
+	Register(in=aRegIn, out=aRegOut, out[0..14]=addressM, load=cb2);
+	
+	// store in the A register if an A instruction or d1 set for the previous
+	// instruction
+	Not(in=instruction[15], out=aInstruction);
+	Or(a=aInstruction, b=d1, out=cb2);
+
+	// the D register
+	Register(in=ALUout,out=ALUx, load=d2);
+	
+	// the M register. Should use a bunch of DFFs cause
+	// inM should always be propagated, shouldn't it?
+	Register(in=inM, out=m, load=true);
+	
+	// if "a" bit set in instruction, use M otherwise A register
+	// probably we don't need to check for an A Type instruction
+	// here because the results of the ALU should be ignored in
+	// that case
+	Mux16(a=aRegOut, b=m, sel=instruction[12], out=ALUy);
+
+	// decoding the instruction:
+	// we have already handled the A instruction
+	// c instruction format:
+	// instruction[13..15] true
+	// instruction[12]= a  if true, use M, if not use A register (cr5)
+	// instruction[11]= c1 = ALU.zx
+	// instruction[10]= c2 = ALU.nx
+	// instruction[9] = c3 = ALU.zy
+	// instruction[8] = c4 = ALU.ny
+	// instruction[7] = c5 = ALU.f
+	// instruction[6] = c6 = ALU.no
+	// note that the destination bits need to be stored, otherwise they will
+	// instruction[5] = d1 (store A register)
+	// instruction[4] = d2 (store D register)
+	// instruction[3] = d3 (store RAM[A])
+	// instruction[2] = j1
+	// instruction[1] = j2
+	// instruction[0] = j3
+	
+
+	ALU(x=ALUx, y=ALUy, out=ALUout, out=outM,
+	    zx = instruction[11],
+	    nx = instruction[10],
+		zy = instruction[9],
+		ny = instruction[8],
+		f  = instruction[7],
+		no = instruction[6],
+		zr = zr, ng = ng);
+
+	// Jump logic
+	Not(in=j1, out=notj1);	
+	Not(in=j2, out=notj2);
+	Not(in=j3, out=notj3);
+	Not(in=zr, out=notz);
+	Not(in=ng, out=pos);
+
+	And(a=notj2, b=notj3, out=notj2Andnotj3);
+	And(a=notj2, b=   j3, out=notj2Andj3);
+	And(a=   j2, b=notj3, out=   j2Andnotj3);
+	And(a=   j2, b=   j3, out=   j2Andj3);
+	
+	// don't need to check for notj1 & notj2 & notj3, that's no jump
+	And(a=notj1, b=notj2Andj3,    out=notj1Andnotj2Andj3); // JGT
+	And(a=notj1, b=   j2Andnotj3, out=notj1Andj2Andnotj3); // JEQ
+	And(a=notj1, b=   j2Andj3,    out=notj1Andj2Andj3);    // JGE
+	And(a=j1,    b=notj2Andnotj3, out=j1Andnotj2Andnotj3); // JLT
+	And(a=j1,    b=notj2Andj3,    out=j1Andnotj2Andj3);    // JNE
+	And(a=j1,    b=   j2Andnotj3, out=j1Andj2Andnotj3);    // JLE
+	And(a=j1,    b=   j2Andj3,    out=jmp);                // JMP
+
+	// JGT
+	And(a=pos,                b=notz, out=gt0);
+	And(a=notj1Andnotj2Andj3, b=gt0,  out=jgt);
+	
+	// JEQ
+	And(a=zr,   b=notj1Andj2Andnotj3, out=jeq);
+	
+	// JGE
+	And(a=pos,  b=notj1Andj2Andj3,    out=jge);
+	
+	// JLT
+	And(a=ng,   b=j1Andnotj2Andnotj3, out=jlt);
+	
+	// JNE
+	And(a=notz, b=j1Andnotj2Andj3,    out=jne);
+	
+	// JLE
+	Or(a=ng,    b=zr,                 out=le0);
+	And(a=le0,  b=j1Andj2Andnotj3,    out=jle);
+	
+	Or(a=jgt,      b=jeq,      out=jgtOrjeq);
+	Or(a=jge,      b=jlt,      out=jgeOrjlt);
+	Or(a=jne,      b=jle,      out=jneOrjle);
+	Or(a=jgtOrjeq, b=jgeOrjlt, out=jgtOrjeqOrjgeOrjlt);
+	Or(a=jneOrjle, b=jmp,      out=jneOrjleOrjmp);
+	Or(a=jgtOrjeqOrjgeOrjlt, b=jneOrjleOrjmp, out=jump);
+	
+	PC(in=aRegOut, out[0..14]=pc, load=jump, reset=reset, inc=true);
 }
