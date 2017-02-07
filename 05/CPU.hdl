@@ -39,143 +39,89 @@ CHIP CPU {
         pc[15];          // address of next instruction
 
     PARTS:
-    // Put your code here:
-	
-	// I have numbered the "c" control bits from the
-	// "Hack CPU Implementation diagram" as cb1-8, referring to
-	// the diagram left to right, top to bottom, to avoid confusion
-	// with the c1-c6 from the instruction format of the c instruction
-	
-	// save the destination bits and jump bits for when the current A & D
-	// register (and combinatorial functions of them) have stabilized. But only
-	// do so if the current instruction type is C, otherwise they MUST be
-	// ignored
-	
-	// d1
-	And(a=instruction[15], b=instruction[5], out=aDest);
-	DFF(in=aDest, out=d1);
-	// d2
-	And(a=instruction[15], b=instruction[4], out=dDest);
-	DFF(in=dDest, out=d2);
-	// d3 needs to be stored, writeM
-	And(a=instruction[15], b=instruction[3], out=mDest);
-	DFF(in=mDest, out=d3, out=writeM);
-	
-	// same for the j bits, ignore them if instruction is A type
-	// j1
-	And(a=instruction[15], b=instruction[2], out=jmp1);
-	DFF(in=jmp1, out=j1);
-	// j2
-	And(a=instruction[15], b=instruction[1], out=jmp2);
-	DFF(in=jmp2, out=j2);
-	// j3
-	And(a=instruction[15], b=instruction[0], out=jmp3);
-	DFF(in=jmp3, out=j3);
-	
-	// same for a bit in instruction
-	And(a=instruction[15], b=instruction[12], out=abit);
-	DFF(in=abit, out=a);
-	
-	// cb1=instruction[15]
-	Mux16(a=instruction, b=ALUout, sel=instruction[15], out=aRegIn);
-
-	// the A register
-	Register(in=aRegIn, out=aRegOut, out[0..14]=addressM, load=cb2);
-	
-	// store in the A register if an A instruction or d1 set for the previous
-	// instruction
+	// Is this an A or a C instruction?
 	Not(in=instruction[15], out=aInstruction);
-	Or(a=aInstruction, b=d1, out=cb2);
+	
+	// Decode the instruction if it is C instruction (i.e. instruction[15] is set)
 
-	// the D register
-	Register(in=ALUout,out=ALUx, load=d2);
-	
-	// the M register. Should use a bunch of DFFs cause
-	// inM should always be propagated, shouldn't it?
-	Register(in=inM, out=m, load=true);
-	
-	// if "a" bit set in instruction, use M otherwise A register
-	// probably we don't need to check for an A Type instruction
-	// here because the results of the ALU should be ignored in
-	// that case
-	Mux16(a=aRegOut, b=m, sel=instruction[12], out=ALUy);
+	//   is the A bit set?
+	And(a=instruction[15], b=instruction[12], out=aBit);
 
-	// decoding the instruction:
-	// we have already handled the A instruction
-	// c instruction format:
-	// instruction[13..15] true
-	// instruction[12]= a  if true, use M, if not use A register (cr5)
-	// instruction[11]= c1 = ALU.zx
-	// instruction[10]= c2 = ALU.nx
-	// instruction[9] = c3 = ALU.zy
-	// instruction[8] = c4 = ALU.ny
-	// instruction[7] = c5 = ALU.f
-	// instruction[6] = c6 = ALU.no
-	// note that the destination bits need to be stored, otherwise they will
-	// instruction[5] = d1 (store A register)
-	// instruction[4] = d2 (store D register)
-	// instruction[3] = d3 (store RAM[A])
-	// instruction[2] = j1
-	// instruction[1] = j2
-	// instruction[0] = j3
-	
+	// control bits for the ALU
+	And(a=instruction[15], b=instruction[11], out=c1); // zero A/M?
+	And(a=instruction[15], b=instruction[10], out=c2); // invert A/M?
+	And(a=instruction[15], b=instruction[9],  out=c3); // zero D?
+	And(a=instruction[15], b=instruction[8],  out=c4); // invert D?
+	And(a=instruction[15], b=instruction[7],  out=c5); // And or Add?
+	And(a=instruction[15], b=instruction[6],  out=c6); // invert output
 
-	ALU(x=ALUx, y=ALUy, out=ALUout, out=outM,
-	    zx = instruction[11],
-	    nx = instruction[10],
-		zy = instruction[9],
-		ny = instruction[8],
-		f  = instruction[7],
-		no = instruction[6],
-		zr = zr, ng = ng);
+	// destination bits
+	And(a=instruction[15], b=instruction[5], out=d1);             // A Register
+	And(a=instruction[15], b=instruction[4], out=d2);             // D Register
+	And(a=instruction[15], b=instruction[3], out=d3, out=writeM); // RAM
 
-	// Jump logic
-	Not(in=j1, out=notj1);	
-	Not(in=j2, out=notj2);
-	Not(in=j3, out=notj3);
-	Not(in=zr, out=notz);
-	Not(in=ng, out=pos);
+	// jump bits
+	And(a=instruction[15], b=instruction[2], out=j1);
+	And(a=instruction[15], b=instruction[1], out=j2);
+	And(a=instruction[15], b=instruction[0], out=j3);
+	
+	// D Register, always feeds the ALU x input.
+	// Note this is exactly the same as a Register
+	// except that it provides a GUI, and is used
+	// in the test code.
+	// Always takes input from aluOut, but only updates
+	// if the appropriate destination bit d2 is set.
+	DRegister(in=aluOut, out=x, load=d2);
+	
+	// A Register
+	// If an A instruction, load the A register from the instruction.
+	// Load from aluOut if the d1 destination bit is set.
+	// Otherwise keep previous value.
+	Mux16(a=instruction, b=aluOut, sel=instruction[15], out=aIn);
+	Or(a=aInstruction, b=d1, out=loadA);
+	Register(in=aIn, out=aRegister, out[0..14]=addressM, load=loadA);
+	
+	// If the aBit is set, ALU y is from RAM, otherwise from A Register.
+	Mux16(a=aRegister, b=inM, sel=aBit, out=y);
 
-	And(a=notj2, b=notj3, out=notj2Andnotj3);
-	And(a=notj2, b=   j3, out=notj2Andj3);
-	And(a=   j2, b=notj3, out=   j2Andnotj3);
-	And(a=   j2, b=   j3, out=   j2Andj3);
+	// 'eq' is aluOut==0, 'lt' is aluOut < 0
+	ALU(x=x, y=y, zx=c1, nx=c2, zy=c3, ny=c4, f=c5, no=c6,
+	    out=aluOut, zr=eq, ng=lt);
 	
-	// don't need to check for notj1 & notj2 & notj3, that's no jump
-	And(a=notj1, b=notj2Andj3,    out=notj1Andnotj2Andj3); // JGT
-	And(a=notj1, b=   j2Andnotj3, out=notj1Andj2Andnotj3); // JEQ
-	And(a=notj1, b=   j2Andj3,    out=notj1Andj2Andj3);    // JGE
-	And(a=j1,    b=notj2Andnotj3, out=j1Andnotj2Andnotj3); // JLT
-	And(a=j1,    b=notj2Andj3,    out=j1Andnotj2Andj3);    // JNE
-	And(a=j1,    b=   j2Andnotj3, out=j1Andj2Andnotj3);    // JLE
-	And(a=j1,    b=   j2Andj3,    out=jmp);                // JMP
+	// Emit aluOut on outM if a destination RAM is requested (d3 is set.)
+	// This isn't strictly necessary, because outM should only be used if
+	// writeM is set, and it also adds another level of logic, but it's
+	// somewhat cleaner and less unexpected to drive outM to 0 if it's not
+	// selected as a destination. In a real chip the output to memory would
+	// probably go hi Z so another device could assert a signal on the bus.
+	Mux16(a=false, b=aluOut, sel=d3, out=outM);
+	
+	// Jump logic: comparing aluOut to zero,
+	// j1 j2 j3    condtion to jump
+	//  0  0  0    null no jump
+	//  0  0  1    JGT  jump if aluOut greater than 0
+	//  0  1  0    JEQ  jump if aluOut equal to 0
+	//  0  1  1    JGE  jump if aluOut greater than or equal to 0
+	//  1  0  0    JLT  jump if aluOut less than 0
+	//  1  0  1    JNE  jump if aluOut not equal to 0
+	//  1  1  0    JLE  jump if aluOut less than or equal to 0
+	//  1  1  1    JMP  jump always
 
-	// JGT
-	And(a=pos,                b=notz, out=gt0);
-	And(a=notj1Andnotj2Andj3, b=gt0,  out=jgt);
+	// greater than
+	And(a=ge, b=ne, out=gt);
+	// equal to, already covered
+	// greater than equal to
+	Not(in=lt, out=ge);
+	// not equal
+	Not(in=eq, out=ne);
+	// less than, already covered
+	// less than equal to
+	Or(a=lt, b=eq, out=le);
 	
-	// JEQ
-	And(a=zr,   b=notj1Andj2Andnotj3, out=jeq);
+	// To do the jump logic, an 8 way multiplexor can be used
+	Mux8Way(a=false, b=gt, c=eq, d=ge, e=lt, f=ne, g=le, h=true,
+			sel[0]=j3, sel[1]=j2, sel[2]=j1,
+			out=jump);
 	
-	// JGE
-	And(a=pos,  b=notj1Andj2Andj3,    out=jge);
-	
-	// JLT
-	And(a=ng,   b=j1Andnotj2Andnotj3, out=jlt);
-	
-	// JNE
-	And(a=notz, b=j1Andnotj2Andj3,    out=jne);
-	
-	// JLE
-	Or(a=ng,    b=zr,                 out=le0);
-	And(a=le0,  b=j1Andj2Andnotj3,    out=jle);
-	
-	Or(a=jgt,      b=jeq,      out=jgtOrjeq);
-	Or(a=jge,      b=jlt,      out=jgeOrjlt);
-	Or(a=jne,      b=jle,      out=jneOrjle);
-	Or(a=jgtOrjeq, b=jgeOrjlt, out=jgtOrjeqOrjgeOrjlt);
-	Or(a=jneOrjle, b=jmp,      out=jneOrjleOrjmp);
-	Or(a=jgtOrjeqOrjgeOrjlt, b=jneOrjleOrjmp, out=jump);
-	
-	PC(in=aRegOut, out[0..14]=pc, load=jump, reset=reset, inc=true);
+	PC(in=aRegister, load=jump, inc=true, reset=reset, out[0..14]=pc);
 }
