@@ -1,0 +1,266 @@
+#!/usr/bin/env perl
+# Hack assembler. For http://www.nand2tetris.org
+# Copyright 2017 Cian Moriarty
+# Distributable under the terms of the LGPL v2
+
+# Note that when "binary" is mentioned, it means 0 and 1 represented in
+# ASCII, i.e. each "bit" represented by an ASCII byte, of value 0 or 1
+# additionally, 16 "bits" are grouped into a "word" and each word is
+# is followed by an end of line character
+
+use strict;
+use warnings;
+use File::Basename;
+use File::Temp 'tempfile';
+use Data::Dumper;
+
+# Breakdown the name of the assembly language file named as the first argument
+my ( $file_base, $dir, $suffix ) = fileparse($ARGV[0], ('.asm'));
+
+# check that the suffix and base filename are good
+(($suffix ne '') and ($file_base ne '')) or die "usage: $0 filename.asm";
+
+# Open the assembly language file
+my ( $filename_asm ) = @ARGV;
+open ( my $input, "<", $filename_asm ) or die $!;
+# close it cause we don't really need it, we just needed to check
+close ( $input ) or die $!;
+
+# Create a temporary file for storing the comment stripped file
+($input, my $filename_a) = tempfile() or die $!;
+
+# Pass the original .asm file to the C Preprocessor to strip comments.
+# -P removes line numbers in cpp output
+# because C style comments are a pain in the arse
+print "cpp $filename_asm -P -o $filename_a\n"; ## debug
+# and die is used cause system returns 0 on success
+system ( "cpp $filename_asm -P -o $filename_a" ) and die $!;
+
+# Open the stripped assembly language file to translate
+open ( $input, "<", $filename_a ) or die $!;
+
+# The global symbol table
+our %symbols = (
+	R0     =>     0,
+	R1     =>     1,
+	R2     =>     2,
+	R3     =>     3,
+	R4     =>     4,
+	R5     =>     5,
+	R6     =>     6,
+	R7     =>     7,
+	R8     =>     8,
+	R9     =>     9,
+	R10    =>    10,
+	R11    =>    11,
+	R12    =>    12,
+	R13    =>    13,
+	R14    =>    14,
+	R15    =>    15,
+	SCREEN => 16384,
+	KBD    => 24576,
+	SP     =>     0,
+	LCL    =>     1,
+	ARG    =>     2,
+	THIS   =>     3,
+	THAT   =>     4,
+);
+
+### C Instruction format:
+### Symbolic: dest = comp ; jump
+### Binary:   1 1 1 a c1 c2 c3 c4 c5 c6 d1 d2 d3 j1 j2 j3
+###
+### comp     c1 c2 c3 c4 c5 c6
+###  a=0 a=1
+###    0      1  0  1  0  1  0
+###    1      1  1  1  1  1  1
+###   -1      1  1  1  0  1  0
+###    D      0  0  1  1  0  0
+###    A   M  1  1  0  0  0  0
+###   !D      0  0  1  1  0  1
+###   !A  !M  1  1  0  0  0  1
+###   -D      0  0  1  1  1  1
+###   -A  -M  1  1  0  0  1  1
+###  D+1      0  1  1  1  1  1
+###  A+1 M+1  1  1  0  1  1  1
+###  D-1      0  0  1  1  1  0
+###  A-1 M-1  1  1  0  0  1  0
+###  D+A D+M  0  0  0  0  1  0
+###  D-A D-M  0  1  0  0  1  1
+###  A-D M-D  0  0  0  1  1  1
+###  D&A D&M  0  0  0  0  0  0
+###  D|A D|M  0  1  0  1  0  1
+###
+### dest d1 d2 d3 effect: the value is stored in:
+###       0  0  0         nowhere
+###   M   0  0  1         RAM[A]
+###    D  0  1  0         D register
+###   MD  0  1  1         RAM[A] AND D register
+###  A    1  0  0         A register
+###  AM   1  0  1         A register and RAM[A]
+###  A D  1  1  0         A register and D register
+###  AMD  1  1  1         A register, RAM[A], and D register
+###
+### jump j1 j2 j3 Effect:
+###       0  0  0        no jump
+###  JGT  0  0  1        if out >  0 jump
+###  JEQ  0  1  0        if out  = 0 jump
+###  JGE  0  1  1        if out >= 0 jump
+###  JLT  1  0  0        if out <  0 jump
+###  JNE  1  0  1        if out != 0 jump
+###  JLE  1  1  0        if out <= 0 jump
+###  JMP  1  1  1        unconditional jump
+
+# computation codes for C instructions
+our %comp = (
+	  '0', '0101010',
+	  '1', '0111111',
+	 '-1', '0111010',
+	  'D', '0001100',
+	  'A', '0110000',
+	  'M', '1110000',
+	 '!D', '0001101',
+	 '!A', '0110001',
+	 '!M', '1110001',
+	 '-D', '0001111',
+	 '-A', '0110011',
+	 '-M', '1110011',
+	'D+1', '0011111',
+	'A+1', '0110111',
+	'M+1', '1110111',
+	'D-1', '0001110',
+	'A-1', '0110010',
+	'M-1', '1110010',
+	'D+A', '0000010',
+	'D+M', '1000010',
+	'D-A', '0010011',
+	'D-M', '1010011',
+	'A-D', '0000111',
+	'M-D', '1000111',
+	'D&A', '0000000',
+	'D&M', '1000000',
+	'D|A', '0010101',
+	'D|M', '1010101',
+);
+
+# destination codes for C instructions
+our %dest = (
+	'null', '000',
+	'M',    '001',
+	'D',    '010',
+	'MD',   '011',
+	'A',    '100',
+	'AM',   '101',
+	'AD',   '110',
+	'AMD',  '111',
+	
+);
+
+# jump codes for c instructions
+our %jump = (
+	'null', '000',	
+	'JGT',  '001',
+	'JEQ',  '010',
+	'JGE',  '011',
+	'JLT',  '100',
+	'JNE',  '101',
+	'JLE',  '110',
+	'JMP',  '111',
+);
+
+# First pass resolves all forward references to symbols.
+# As the only forward reference can be to a label, we
+# only have to look for labels to resolve them.
+my $line_number = 0;
+
+while ( <$input> ) {
+	## strip all whitespace
+	## (comments already stripped)
+	s/\s//g;
+	
+	## skip blank lines
+	($_ ne "") or next;
+	
+	## look through the input line by line, taking count of line number
+	## (not including white space).
+	if ( /^\(([a-zA-Z\.\_\$][\w\.\$]*)\)$/ ) {
+		## When a line of the form (XXXXX)
+		## is found, store the current line number + 1 into the symbol table
+		## with key 'XXXXX'. Do not increment line number.
+		## print ( "found label $1 at line: $line_number\n" ); ## debug
+		$symbols{$1} = $line_number;
+	} else {
+		$line_number++;
+	}
+}
+
+## print Dumper(%symbols); ## debug
+
+# rewind the input
+seek ( $input, 0, 0 );
+
+# Second pass emits code
+my $next_variable = 16;
+
+while ( <$input> ) {
+	## reset the regex captures (they aren't if they don't match anything)
+	## this isn't allowed either o.o
+	#$1 = '';
+	#$2 = '';
+	#$3 = '';
+
+	## ignore labels, they are already in the symbol table
+	if ( /^\([a-zA-Z\.\_\$][\w\.\$]*\)$/ ) {
+		next;
+	}
+	
+	## handle A instructions
+	if ( /^@([\w\.\$])$/ ) {
+		my $address;
+		
+		## all numeric type
+		if ( $1 =~ /(\d*)/ ) {
+			$address = $1;
+		} else {
+			if (exists($symbols{$1})) {
+				## variable found in the symbol table
+				$address = $symbols{$1};
+			} else {
+				## variable not found, allocate a new one
+				## and put it into symbol table
+				$symbols{$1} = $next_variable;
+				$address = $next_variable;
+				
+				## if a new variable starts to overlap with SCREEN,
+				## then we have more variables than we can allocate,
+				## and very likely something has gone wrong.
+				($address < 16384)
+					or die "could not allocate variable $1, memory full!\n";
+
+				## advance the address of the next variable to the next
+				## free place in memory
+				$next_variable++;
+			}
+		}
+		## check that the number isn't more than 0x7fff, the biggest 15 bit
+		## unsigned number
+		($address <= 0x7fff) or die "$1: $address is too large!\n";
+		## output the A expression which just the 15 bit unsigned number,
+		## sign extended into 16 binary
+		print ( "$address\n" );
+		printf ("%016b\n", $address);
+	}
+
+	### of the form '@number' where number is a 15 bit unsigned number
+	### emit the number in 16 bit sign extended big endian binary
+
+	### of the form '@symbol' where symbol is a case sensitive symbol
+	### look up 'symbol' in the global symbol table. If no entry is found
+	### add a new entry to the symbol table key 'symbol' and value a number
+	### starting at 16 for the first such symbol not already in the symbol
+	### table and 17 for the second, and so on. Emit the number associated
+	### with the symbol as 16 bit sign extened binary
+
+	## handle C instructions
+
+}
