@@ -209,26 +209,43 @@ while ( <$input> ) {
 	#$2 = '';
 	#$3 = '';
 
+	## strip all whitespace
+	## (comments already stripped)
+	s/\s//g;
+	
+	print;
+	print "\n";
+	
+	## skip blank lines
+	($_ ne "") or next;
+
 	## ignore labels, they are already in the symbol table
 	if ( /^\([a-zA-Z\.\_\$][\w\.\$]*\)$/ ) {
 		next;
 	}
-	
+
 	## handle A instructions
-	if ( /^@([\w\.\$])$/ ) {
+	if ( /^@([\w\.\$]*)$/ ) {
 		my $address;
+		my $ainstruction = $1;
+		
+		#print "$ainstruction\n";
+		
+		#print "found a instruction\n"; ## debug
+		#print; ## debug
+		#print "\n"; ## debug
 		
 		## all numeric type
-		if ( $1 =~ /(\d*)/ ) {
+		if ( $ainstruction =~ /^(\d+)$/ ) { 
 			$address = $1;
 		} else {
-			if (exists($symbols{$1})) {
+			if (exists($symbols{$ainstruction})) {
 				## variable found in the symbol table
-				$address = $symbols{$1};
+				$address = $symbols{$ainstruction};
 			} else {
 				## variable not found, allocate a new one
 				## and put it into symbol table
-				$symbols{$1} = $next_variable;
+				$symbols{$ainstruction} = $next_variable;
 				$address = $next_variable;
 				
 				## if a new variable starts to overlap with SCREEN,
