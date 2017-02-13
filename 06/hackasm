@@ -1,7 +1,12 @@
 #!/usr/bin/env perl
-# Hack assembler. For http://www.nand2tetris.org
+# Two pass Hack assembler in Perl
+# For the Hack computer and assembly language from http://www.nand2tetris.org
 # Copyright 2017 Cian Moriarty
 # Distributable under the terms of the LGPL v2
+# The Hack computer and assembler and http://www.nand2tetris.org
+# Copyright Nisan and Schocken
+# and documented in "The Elements of Computing Systems"
+# by Nisan and Schocken, MIT Press.
 
 # Note that when "binary" is mentioned, it means 0 and 1 represented in
 # ASCII, i.e. each "bit" represented by an ASCII byte, of value 0 or 1
@@ -16,6 +21,12 @@ use Data::Dumper;
 
 # Breakdown the name of the assembly language file named as the first argument
 my ( $file_base, $dir, $suffix ) = fileparse($ARGV[0], ('.asm'));
+
+# open the .hack file for output
+# A bareword file handle is used because an indirect one is misinterpreted
+# (lots of GLOB(0x..) noise to STDOUT, trying to print the file rather than
+#  print to the file) 
+open ( HACKFILE, '>', $file_base . '.hack') or die $!;
 
 # check that the suffix and base filename are good
 (($suffix ne '') and ($file_base ne '')) or die "usage: $0 filename.asm";
@@ -32,7 +43,7 @@ close ( $input ) or die $!;
 # Pass the original .asm file to the C Preprocessor to strip comments.
 # -P removes line numbers in cpp output
 # because C style comments are a pain in the arse
-print "cpp $filename_asm -P -o $filename_a\n"; ## debug
+#print "cpp $filename_asm -P -o $filename_a\n"; ## debug
 # and die is used cause system returns 0 on success
 system ( "cpp $filename_asm -P -o $filename_a" ) and die $!;
 
@@ -213,8 +224,8 @@ while ( <$input> ) {
 	## (comments already stripped)
 	s/\s//g;
 	
-	print;
-	print "\n";
+	##print; ## debug
+	##print "\n"; ## debug
 	
 	## skip blank lines
 	($_ ne "") or next;
@@ -264,20 +275,56 @@ while ( <$input> ) {
 		($address <= 0x7fff) or die "$1: $address is too large!\n";
 		## output the A expression which just the 15 bit unsigned number,
 		## sign extended into 16 binary
-		print ( "$address\n" );
-		printf ("%016b\n", $address);
+		##print ( "$address\n" ); ## debug
+		printf (HACKFILE ("%016b\n", $address));
+	## handle C Instructions
+	} elsif
+		(/^((A?M?D?)=)?([ADM01\+\-\!\&\|]*)(\;(JGT|JEQ|JGE|JLT|JNE|JLE|JMP))?$/) {
+		##print ( "found C Instruction:\n" ); ## debug
+		# print ( "\$1: $1 \$2: $2 \$3: $3 \$4: $4 \$5: $5 \$6: $6\n" ); ## debug
+		my $destination = $2;
+		my $operation   = $3;
+		my $jumpcond    = $5;
+		
+		## suppress uninitialized warnings for this block
+		## this is fine because this is the purpose, to check
+		## if $destination and $jumpcond were initialized and
+		## initialize them if they weren't
+		do {
+			no warnings 'uninitialized';
+			if( $destination eq '') {
+				$destination = 'null';
+			}
+			if( $jumpcond eq '') {
+				$jumpcond = 'null';
+			}
+		};
+		
+		##print ( "$destination = $operation \; $jumpcond\n" ); ## debug
+		
+		## start outputing the binary
+		
+		exists($comp{$operation}) or die "Unrecognised operation $operation";
+		
+		## unlike the previous line, these shouldn't be necessary. But keep
+		## them for debugging
+		exists($dest{$destination})
+			or die "Unrecognised destination $destination";
+		exists($jump{$jumpcond})
+			or die "Unrecognised jump specifier $jumpcond";
+
+		
+		print(HACKFILE ("111"));
+		print(HACKFILE ($comp{$operation}));
+		print(HACKFILE ($dest{$destination}));
+		print(HACKFILE ("$jump{$jumpcond}\n"));
+
+	} else {
+		## something went wrong, unrecognised line
+		die "Unrecognised line: $_"
 	}
-
-	### of the form '@number' where number is a 15 bit unsigned number
-	### emit the number in 16 bit sign extended big endian binary
-
-	### of the form '@symbol' where symbol is a case sensitive symbol
-	### look up 'symbol' in the global symbol table. If no entry is found
-	### add a new entry to the symbol table key 'symbol' and value a number
-	### starting at 16 for the first such symbol not already in the symbol
-	### table and 17 for the second, and so on. Emit the number associated
-	### with the symbol as 16 bit sign extened binary
-
-	## handle C instructions
-
 }
+
+close $input or die $!;
+unlink $filename_a or die $1;
+close HACKFILE;
