@@ -13,6 +13,7 @@ my $parser = Parser->new( $ARGV[0] );
 my $writer = CodeWriter->new( $file_base . ".asm" );
 
 while($parser->hasMoreCommands()) {
+	$parser->advance();
 	$parser->printCmd();
 }
 

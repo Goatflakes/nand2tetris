@@ -1,9 +1,8 @@
 package Parser;
 use strict;
 use warnings;
-# use Data::Dumper; ## debug
+#use Data::Dumper; #debug
 
-# TODO: this needs to have an argument that tells it what input file to use
 # Opens the input file and gets ready to parse it.
 sub new {
 	if(scalar @_ != 2) {
@@ -35,9 +34,7 @@ sub hasMoreCommands {
 		# no more input
 		return(0);
 	} else {
-		# trying to use the <> operator here gives a syntax error
-		my $line = readline($self->{_file});
-		$self->{_nextCommand} = $line;
+		return(1);
 	}
 }
 
@@ -51,6 +48,10 @@ sub advance {
 	if(scalar @args > 0) {
 		die "Parser::advance() incorrectly passed an argument";
 	}
+	
+	# trying to use the <> operator here gives a syntax error
+	my $line = readline($self->{_file});
+	$self->{_nextCommand} = $line;
 }
 
 # Returns a constant representing the type of the current command.
