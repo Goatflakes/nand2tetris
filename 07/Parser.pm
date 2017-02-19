@@ -42,7 +42,6 @@ sub new {
 # Are there more commands in the input?
 # Sets up the current command and returns true if that makes sense
 # No arguments.
-# TODO: we need to strip comments
 sub hasMoreCommands {
 	my ($self, @args) = @_;
 	if(scalar @args > 0) {
@@ -70,6 +69,31 @@ sub advance {
 	# trying to use the <> operator here gives a syntax error
 	my $line = readline($self->{_file});
 	$self->{_nextCommand} = $line;
+	
+	# now parse the line
+	if ($line =~ /^\s*(add|sub|neg|eq|gt|lt|and|or}not)\s*$/) {
+		$self->{_type} = "C_ARITHMETIC";
+		$self->{_arg1} = $1;
+		$self->{_arg2} = undef;
+	}
+	elsif ($line =~ /^\s*
+					(push|pop)
+					\s*
+					(local|argument|this|that|constant|static|temp|pointer)
+					\s*
+					([0-9]+)
+					\s*$/x) {
+		if($1 eq 'push') {
+			$self->{_type} = "C_PUSH";
+		} else {
+			$self->{_type} = "C_POP";
+		}
+		$self->{_arg1} = $2;
+		$self->{_arg2} = $3;
+	}
+	else {
+		die "Unrecognised command line $line\n";
+	}
 }
 
 # Returns a constant representing the type of the current command.
@@ -84,6 +108,7 @@ sub commandType {
 	if(scalar @args > 0) {
 		die "Parser::commandType() incorrectly passed an argument";
 	}
+	return $self->{_type};
 	
 }
 
@@ -96,7 +121,7 @@ sub arg1 {
 	if(scalar @args > 0) {
 		die "Parser::arg1() incorrectly passed an argument";
 	}
-	
+	return $self->{_arg1};
 }
 
 # Returns the second argument of the current command. Should be called only if
@@ -107,7 +132,7 @@ sub arg2 {
 	if(scalar @args > 0) {
 		die "Parser::arg2() incorrectly passed an argument";
 	}
-	
+	return $self->{_arg2};
 }
 
 # closes the .vm file
@@ -122,7 +147,6 @@ sub closeFile {
 }
 
 # Prints the current line the parser is on for debugging purposes
-
 sub printCmd {
 	my ($self, @args) = @_;
 	if(scalar @args > 0) {
@@ -130,6 +154,22 @@ sub printCmd {
 	}
 	
 	print "$self->{_nextCommand}";
+	if($self->commandType() eq 'C_ARITHMETIC') {
+		print $self->commandType();
+		print " ";
+		print $self->arg1();
+		print "\n";
+	} elsif ($self->commandType() =~ /(C_PUSH|C_POP)/) {
+		print $self->commandType();
+		print " ";
+		print $self->arg1();
+		print " ";
+		print $self->arg2();
+		print "\n";
+	} else {
+		die "Unknown command type!\n";
+	}
 }
+
 # return non zero so use works
 1;
