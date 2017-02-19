@@ -68,6 +68,7 @@ sub advance {
 	
 	# trying to use the <> operator here gives a syntax error
 	my $line = readline($self->{_file});
+	chomp($line);
 	$self->{_nextCommand} = $line;
 	
 	# now parse the line
@@ -169,6 +170,14 @@ sub printCmd {
 	} else {
 		die "Unknown command type!\n";
 	}
+}
+
+sub getCmd {
+	my ($self, @args) = @_;
+	if(scalar @args > 0) {
+		die "Parser::getCmd() incorrectly passed an argument";
+	}
+	return $self->{_nextCommand};
 }
 
 # return non zero so use works

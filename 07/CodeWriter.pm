@@ -43,6 +43,14 @@ sub writePushPop {
 	print "got a writePushPop($args[0], $args[1], $args[2])\n"; # debug
 }
 
+sub writeComment {
+	(my $self, my @args) = @_;
+	if(scalar @args != 1) {
+		die "usage: CodeWriter::writeComment(<string>)";
+	}
+	print "// $args[0]\n"; # debug
+}
+
 # Closes the .asm output file
 sub closeFile {
 	(my $self, my @args) = @_;
