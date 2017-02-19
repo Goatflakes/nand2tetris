@@ -2,10 +2,7 @@ package CodeWriter;
 use strict;
 use warnings;
 
-# now, is this filehandle a class or object variable?
-
 # Opens the output file and gets ready to write into it.
-# TODO: Needs to have the .asm output file as an argument
 # returns the new CodeWriter object
 sub new {
 	if(scalar @_ != 2) {
