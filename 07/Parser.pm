@@ -1,12 +1,20 @@
 package Parser;
-use Strict;
-use Warnings;
+use strict;
+use warnings;
+# use Data::Dumper; ## debug
 
 # TODO: this needs to have an argument that tells it what input file to use
 # Opens the input file and gets ready to parse it.
 sub new {
+	if(scalar @_ != 2) {
+		die "usage: Parser->new <filename>";
+	}
+
 	my $class = shift;
-	my $self = {};
+	my $filename = shift;
+	
+	open(my $vmfile, "<", $filename) or die $!;
+	my $self = {_file => $vmfile};
 	
 	# initialise member variables here
 	
@@ -15,9 +23,22 @@ sub new {
 }
 
 # Are there more commands in the input?
+# Sets up the current command and returns true if that makes sense
 # No arguments.
+# TODO: we need to strip comments
 sub hasMoreCommands {
-	
+	my ($self, @args) = @_;
+	if(scalar @args > 0) {
+		die "Parser::hasMoreCommands() incorrectly passed an argument";
+	}
+	if (eof($self->{_file})) {
+		# no more input
+		return(0);
+	} else {
+		# trying to use the <> operator here gives a syntax error
+		my $line = readline($self->{_file});
+		$self->{_nextCommand} = $line;
+	}
 }
 
 # Read the next command from the input and makes it the current command.
@@ -25,7 +46,11 @@ sub hasMoreCommands {
 # Initially there is no current command.
 # No arguments.
 sub advance {
-	
+	my ($self, @args) = @_;
+
+	if(scalar @args > 0) {
+		die "Parser::advance() incorrectly passed an argument";
+	}
 }
 
 # Returns a constant representing the type of the current command.
@@ -34,6 +59,12 @@ sub advance {
 # C_FUNCTION, C_RETURN, and C_CALL.
 # No arguments.
 sub commandType {
+
+	my ($self, @args) = @_;
+
+	if(scalar @args > 0) {
+		die "Parser::commandType() incorrectly passed an argument";
+	}
 	
 }
 
@@ -42,6 +73,10 @@ sub commandType {
 # Should not be called if the current command is C_RETURN.
 # No arguments.
 sub arg1 {
+	my ($self, @args) = @_;
+	if(scalar @args > 0) {
+		die "Parser::arg1() incorrectly passed an argument";
+	}
 	
 }
 
@@ -49,8 +84,32 @@ sub arg1 {
 # the current command is C_PUSH, C_POP, C_FUNCTION, or C_CALL.
 # No arguments.
 sub arg2 {
+	my ($self, @args) = @_;
+	if(scalar @args > 0) {
+		die "Parser::arg2() incorrectly passed an argument";
+	}
 	
 }
 
+# closes the .vm file
+sub closeFile {
+	my ($self, @args) = @_;
+	if(scalar @args > 0) {
+		die "Parser::closeFile() incorrectly passed an argument";
+	}
+
+	close($self->{_file});
+}
+
+# Prints the current line the parser is on for debugging purposes
+
+sub printCmd {
+	my ($self, @args) = @_;
+	if(scalar @args > 0) {
+		die "Parser::printCmd() incorrectly passed an argument";
+	}
+	
+	print "$self->{_nextCommand}\n";
+}
 # return non zero so use works
 1;
