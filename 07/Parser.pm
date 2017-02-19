@@ -2,6 +2,8 @@ package Parser;
 use strict;
 use warnings;
 #use Data::Dumper; #debug
+use File::Temp 'tempfile';
+
 
 # Opens the input file and gets ready to parse it.
 sub new {
@@ -10,10 +12,26 @@ sub new {
 	}
 
 	my $class = shift;
-	my $filename = shift;
+	my $filename_vm = shift;
 	
-	open(my $vmfile, "<", $filename) or die $!;
-	my $self = {_file => $vmfile};
+	# try to open the input .vm file
+	open(my $vmfile, "<", $filename_vm) or die $!;
+	# close it cause we don't really need it, we just needed to check
+	close ( $vmfile ) or die $!;
+
+	# Create a temporary file for storing the comment stripped file
+	(my $input, my $filename_stripped) = tempfile() or die $!;
+
+	# Pass the original .vm file to the C Preprocessor to strip comments.
+	# because C style comments are a pain in the arse
+	# -P removes line numbers in cpp output
+	# 'and die' is used cause system returns 0 on success	
+	system ( "cpp $filename_vm -P -o $filename_stripped" ) and die $!;
+
+	# Open the stripped vm language file to translate
+	open ( $input, "<", $filename_stripped ) or die $!;
+
+	my $self = {_file => $input, _filename => $filename_stripped};
 	
 	# initialise member variables here
 	
@@ -100,6 +118,7 @@ sub closeFile {
 	}
 
 	close($self->{_file});
+	unlink($self->{_filename});
 }
 
 # Prints the current line the parser is on for debugging purposes
