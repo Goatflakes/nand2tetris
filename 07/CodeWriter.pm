@@ -32,6 +32,7 @@ sub writeArithmetic {
 	if(scalar @args != 1) {
 		die "usage: CodeWriter::writeArithmetic(<command>)";
 	}
+	print "got a writeArithmetic($args[0])\n"; # debug
 }
 
 # Writes to the output file the assembly code that implements the command given
@@ -41,7 +42,8 @@ sub writePushPop {
 	(my $self, my @args) = @_;
 	if(scalar @args != 3) {
 		die "usage: CodeWriter::writePushPop({C_PUSH|C_POP}, segment, index)";
-	}	
+	}
+	print "got a writePushPop($args[0], $args[1], $args[2])\n"; # debug
 }
 
 # Closes the .asm output file

@@ -14,7 +14,18 @@ my $writer = CodeWriter->new( $file_base . ".asm" );
 
 while($parser->hasMoreCommands()) {
 	$parser->advance();
-	$parser->printCmd();
+	$parser->printCmd(); # debug
+	if($parser->commandType() eq 'C_ARITHMETIC') {
+		$writer->writeArithmetic($parser->arg1());
+	} elsif ($parser->commandType() =~ /(C_PUSH|C_POP)/) {
+		$writer->writePushPop(
+			$parser->commandType(),
+			$parser->arg1(),
+			$parser->arg2()
+		);
+	} else {
+		die "Unknown command type!\n";
+	}
 }
 
 $parser->closeFile();
