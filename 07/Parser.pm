@@ -109,7 +109,7 @@ sub printCmd {
 		die "Parser::printCmd() incorrectly passed an argument";
 	}
 	
-	print "$self->{_nextCommand}\n";
+	print "$self->{_nextCommand}";
 }
 # return non zero so use works
 1;
