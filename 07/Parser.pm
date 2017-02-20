@@ -31,7 +31,11 @@ sub new {
 	# Open the stripped vm language file to translate
 	open ( $input, "<", $filename_stripped ) or die $!;
 
-	my $self = {_file => $input, _filename => $filename_stripped};
+	# initial member variables here
+	my $self = (
+		_file => $input,
+		_filename => $filename_stripped
+	);
 	
 	# initialise member variables here
 	
