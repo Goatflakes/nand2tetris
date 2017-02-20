@@ -2,6 +2,20 @@ package CodeWriter;
 use strict;
 use warnings;
 
+# we are computing M op D (if the order matters)
+# note that number of lines for logical comparisons is 6 and for all others is 1
+my %ops = (
+	add => "  D=D+M\n",
+	sub => "  D=M-D\n",
+	eq  => "  D=M-D\n  \@%d\n  D;JEQ\n  \@%d\n  D=0;JMP\n  D=-1\n",
+	gt  => "  D=M-D\n  \@%d\n  D;JGT\n  \@%d\n  D=0;JMP\n  D=-1\n",
+	lt  => "  D=M-D\n  \@%d\n  D;JLT\n  \@%d\n  D=0;JMP\n  D=-1\n",
+	and => "  D=D&M\n",
+	or  => "  D=D|M\n",
+	neg => "  D=-D\n",
+	not => "  D=!D\n"
+);
+
 # Opens the output file and gets ready to write into it.
 # returns the new CodeWriter object
 sub new {
@@ -14,7 +28,9 @@ sub new {
 	
 	open(my $asmfile, ">", $filename) or die $!;
 	
-	my $self = {_file => $asmfile,};
+	# the logical comparisons need jumps to be 100% correct, so store the
+	# the current line number & only increment it for a real instruction
+	my $self = {_file => $asmfile,_line_no => 0};
 	
 	# initialise member variables here
 	
@@ -29,7 +45,50 @@ sub writeArithmetic {
 	if(scalar @args != 1) {
 		die "usage: CodeWriter::writeArithmetic(<command>)";
 	}
-	print "got a writeArithmetic($args[0])\n"; # debug
+	#print "got a writeArithmetic($args[0])\n"; # debug
+	
+	# Work out how many arguments to pop from the stack
+	if($args[0] =~ /^(add|sub|and|or)$/ ) {
+		# dual argument commands
+		# fake 'pop' the arguments into D then M, but don't adjust SP (yet)
+		print {$self->{_file}} "  \@SP\n  A=M-1\n  D=M\n  A=A-1\n";
+		# perform the operation
+		print {$self->{_file}} $ops{$1};
+		# adjust the stack so it will come out right at the end
+		print {$self->{_file}} "  \@SP\n  M=M-1\n";
+		# put D on top of the stack
+		print {$self->{_file}} "  A=M-1\n  M=D\n\n";
+
+		# count up the resulting lines
+		$self->{_line_no} += 9;		
+	} elsif ($args[0] =~ /^(eq|gt|lt)$/) {
+		# dual argument commands of the logical comparison type
+		# these require some jump fuckery to work 100% correctly
+		# fake 'pop' the arguments into D then M, but don't adjust SP (yet)
+		print {$self->{_file}} "  \@SP\n  A=M-1\n  D=M\n  A=A-1\n";
+		$self->{_line_no} += 4;
+		# perform the operation
+		printf {$self->{_file}} $ops{$1}, $self->{_line_no}+5,
+		       $self->{_line_no}+6;
+		# adjust the stack so it will come out right at the end
+		print {$self->{_file}} "  \@SP\n  M=M-1\n";
+		# put D on top of the stack
+		print {$self->{_file}} "  A=M-1\n  M=D\n\n";
+
+		# count up the resulting lines
+		$self->{_line_no} += 10;		
+		
+	} elsif ($args[0] =~ /^(neg|not)$/) {
+		# single argument commands
+		# fake 'pop' into D, but don't adjust SP. We don't need
+		# to, because we'll be pushing to it again no matter what
+		print {$self->{_file}} "  \@SP\n  A=M-1\n  D=M\n";
+		# do the operation
+		print {$self->{_file}} $ops{$1};
+		# store D into the stack
+		print {$self->{_file}} "  M=D\n\n";
+		$self->{_line_no} += 5;
+	}
 }
 
 # Writes to the output file the assembly code that implements the command given
@@ -48,7 +107,7 @@ sub writeComment {
 	if(scalar @args != 1) {
 		die "usage: CodeWriter::writeComment(<string>)";
 	}
-	print "// $args[0]\n"; # debug
+	print {$self->{_file}} "// $args[0]\n"; # debug
 }
 
 # Closes the .asm output file
@@ -59,6 +118,18 @@ sub closeFile {
 	}
 
 	close($self->{_file});
+}
+
+# emit assembly commands to pop stack into D
+sub _popd {
+	print {$self->{file}} "  \@SP\n  M=M-1\n  A=M\n  D=M\n";
+	$self->{_line_no} += 4;
+}
+
+# emit assembly commands to push D to stack
+sub _pushd {
+	print {$self->{file}} "  \@SP\n  A=M\n  M=D\n  \@SP\n  M=M+1\n";
+	$self->{_line_no} += 5;
 }
 
 # return non zero so use works

@@ -72,7 +72,7 @@ sub advance {
 	$self->{_nextCommand} = $line;
 	
 	# now parse the line
-	if ($line =~ /^\s*(add|sub|neg|eq|gt|lt|and|or}not)\s*$/) {
+	if ($line =~ /^\s*(add|sub|neg|eq|gt|lt|and|or|not)\s*$/) {
 		$self->{_type} = "C_ARITHMETIC";
 		$self->{_arg1} = $1;
 		$self->{_arg2} = undef;
