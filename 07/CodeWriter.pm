@@ -26,13 +26,18 @@ sub new {
 	my $class = shift;
 	my $filename = shift;
 	
-	open(my $asmfile, ">", $filename) or die $!;
-	
-	# the logical comparisons need jumps to be 100% correct, so store the
-	# the current line number & only increment it for a real instruction
-	my $self = {_file => $asmfile,_line_no => 0};
+	open(my $asmfile, ">", $filename . '.asm') or die $!;
 	
 	# initialise member variables here
+	my $self = (
+		_file => $asmfile,
+		# the logical comparisons need jumps to be 100% correct, so store the
+		# the current line number & only increment it for a real instruction
+		_line_no => 0,
+		# this is needed for generating symbols for the static segment
+		_basename=$filename
+	);
+	
 	
 	bless ($self, $class);
 	return $self;
@@ -100,6 +105,18 @@ sub writePushPop {
 		die "usage: CodeWriter::writePushPop({C_PUSH|C_POP}, segment, index)";
 	}
 	print "got a writePushPop($args[0], $args[1], $args[2])\n"; # debug
+	
+	if( args[1] =~ // ) {
+		if( args[0] =~ /^(C_PUSH)$/ ) {
+		} elsif( args[0] =~ /^(C_POP)$/ ) {
+		} else {
+			die
+			"usage: CodeWriter::writePushPop({C_PUSH|C_POP}, segment, index)";
+		}
+	} elsif (args[1] =~ //) {
+	} else {
+		die "usage: CodeWriter::writePushPop({C_PUSH|C_POP}, segment, index)";
+	}
 }
 
 sub writeComment {
