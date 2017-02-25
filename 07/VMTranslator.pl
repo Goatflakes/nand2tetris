@@ -3,9 +3,10 @@
 use strict;
 use warnings;
 use File::Basename;
+
 use Parser;
 use CodeWriter;
-use Data::Dumper;
+
 
 my ( $file_base, $dir, $suffix ) = fileparse($ARGV[0], ('.vm'));
 
