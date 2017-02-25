@@ -32,10 +32,10 @@ sub new {
 	open ( $input, "<", $filename_stripped ) or die $!;
 
 	# initial member variables here
-	my $self = (
+	my $self = {
 		_file => $input,
 		_filename => $filename_stripped
-	);
+	};
 	
 	# initialise member variables here
 	

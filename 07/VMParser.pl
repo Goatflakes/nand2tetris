@@ -10,7 +10,7 @@ use Data::Dumper;
 my ( $file_base, $dir, $suffix ) = fileparse($ARGV[0], ('.vm'));
 
 my $parser = Parser->new( $ARGV[0] );
-my $writer = CodeWriter->new( $file_base . ".asm" );
+my $writer = CodeWriter->new( $file_base );
 
 while($parser->hasMoreCommands()) {
 	$parser->advance();
