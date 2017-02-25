@@ -9,9 +9,9 @@ use warnings;
 my %ops = (
 	add => "  D=D+M\n",
 	sub => "  D=M-D\n",
-	eq  => "  D=M-D\n  \@%d\n  D;JEQ\n  \@%d\n  D=-1;JMP\n  D=0\n",
-	gt  => "  D=M-D\n  \@%d\n  D;JGT\n  \@%d\n  D=-1;JMP\n  D=0\n",
-	lt  => "  D=M-D\n  \@%d\n  D;JLT\n  \@%d\n  D=-1;JMP\n  D=0\n",
+	eq  => "  D=M-D\n  \@%d\n  D;JEQ\n  \@%d\n  D=0;JMP\n  D=-1\n",
+	gt  => "  D=M-D\n  \@%d\n  D;JGT\n  \@%d\n  D=0;JMP\n  D=-1\n",
+	lt  => "  D=M-D\n  \@%d\n  D;JLT\n  \@%d\n  D=0;JMP\n  D=-1\n",
 	and => "  D=D&M\n",
 	or  => "  D=D|M\n",
 	neg => "  D=-D\n",
@@ -114,14 +114,14 @@ sub writePushPop {
 	if(scalar @args != 3) {
 		die "usage: CodeWriter::writePushPop({C_PUSH|C_POP}, segment, index)";
 	}
-	print "got a writePushPop($args[0], $args[1], $args[2])\n"; # debug
+	#print "got a writePushPop($args[0], $args[1], $args[2])\n"; # debug
 	
 	my $segment;
 	
 	if( $args[1] =~ /^(constant)$/ ) {
-		print "found push or pop constant\n"; # debug
+		#print "found push or pop constant\n"; # debug
 		if( $args[0] =~ /^(C_PUSH)$/ ) {
-			print "found push constant\n"; # debug
+			# print "found push constant\n"; # debug
 			print {$self->{_file}} "  \@" . $args[2] . "\n  D=A\n";
 			$self->{_line_no} += 2;
 			$self->_pushd();
@@ -133,9 +133,9 @@ sub writePushPop {
 			"usage: CodeWriter::writePushPop({C_PUSH|C_POP}, segment, index)";
 		}
 	} elsif ($args[1] =~ /^(local|argument|this|that)$/) {
-		print "found push or pop " . $1 . "\n"; # debug		
+		# print "found push or pop " . $1 . "\n"; # debug		
 		if( $args[0] =~ /^(C_PUSH)$/ ) {
-			print "found push " . $args[1] . "\n"; # debug
+			#print "found push " . $args[1] . "\n"; # debug
 			print {$self->{_file}} "  \@" . $segments{$args[1]}
 								 . "\n  D=M\n  \@"
 								 . $args[2] . "\n"
@@ -143,7 +143,7 @@ sub writePushPop {
 			$self->{_line_no} += 5;
 			$self->_pushd();
 		} elsif( $args[0] =~ /^(C_POP)$/ ) {
-			print "found pop " . $args[1] . "\n"; # debug
+			#print "found pop " . $args[1] . "\n"; # debug
 			
 			# Calculate the address *(segment register)+i
 			$self->_instr('@' . $segments{$args[1]});
@@ -172,15 +172,15 @@ sub writePushPop {
 		}
 		print {$self->{_file}} "\n";
 	} elsif( $args[1] =~ /^(static)$/ ) {
-		print "found push or pop static\n"; # debug
+		#print "found push or pop static\n"; # debug
 		my $varname = $self->{_basename} . '.' . $args[2];
 		if( $args[0] =~ /^(C_PUSH)$/ ) {
-			print "found push static\n"; # debug
+			#print "found push static\n"; # debug
 			$self->_instr("\@$varname");
 			$self->_instr("D=M");
 			$self->_pushd();
 		} elsif( $args[0] =~ /^(C_POP)$/ ) {
-			print "found pop static\n"; # debug
+			#print "found pop static\n"; # debug
 			$self->_popd();
 			$self->_instr("\@$varname");
 			$self->_instr("M=D");
@@ -190,7 +190,7 @@ sub writePushPop {
 		}
 		print {$self->{_file}} "\n";
 	} elsif( $args[1] =~ /^(pointer)$/ ) {
-		print "found push or pop pointer\n"; # debug
+		#print "found push or pop pointer\n"; # debug
 		my $position;
 		if ($args[2] == 0) {
 			$position = "THIS";
@@ -200,12 +200,12 @@ sub writePushPop {
 			die "access of pointer segment out of range!";
 		}
 		if( $args[0] =~ /^(C_PUSH)$/ ) {
-			print "found push pointer\n"; # debug
+			#print "found push pointer\n"; # debug
 			$self->_instr("\@$position");
 			$self->_instr("D=M");
 			$self->_pushd();
 		} elsif( $args[0] =~ /^(C_POP)$/ ) {
-			print "found pop pointer\n"; # debug
+			#print "found pop pointer\n"; # debug
 			$self->_popd();
 			$self->_instr("\@$position");
 			$self->_instr("M=D");
@@ -215,18 +215,18 @@ sub writePushPop {
 		}
 		print {$self->{_file}} "\n";
 	} elsif( $args[1] =~ /^(temp)$/ ) {
-		print "found push or pop temp\n"; # debug
+		# print "found push or pop temp\n"; # debug
 		($args[2] >= 0 and $args[2] < 8)
 			or die "access of temp segment out of range!";
 		my $position = $args[2] + 5;
 
 		if( $args[0] =~ /^(C_PUSH)$/ ) {
-			print "found push temp\n"; # debug
+			#print "found push temp\n"; # debug
 			$self->_instr("\@$position");
 			$self->_instr("D=M");
 			$self->_pushd();
 		} elsif( $args[0] =~ /^(C_POP)$/ ) {
-			print "found pop temp\n"; # debug
+			#print "found pop temp\n"; # debug
 			$self->_popd();
 			$self->_instr("\@$position");
 			$self->_instr("M=D");
@@ -245,7 +245,7 @@ sub writeComment {
 	if(scalar @args != 1) {
 		die "usage: CodeWriter::writeComment(<string>)";
 	}
-	print {$self->{_file}} "// $args[0]\n"; # debug
+	print {$self->{_file}} "// $args[0]\n";
 }
 
 # Closes the .asm output file
