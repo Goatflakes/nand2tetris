@@ -1,6 +1,7 @@
 package CodeWriter;
 use strict;
 use warnings;
+use File::Basename;
 
 # we are computing M op D (if the order matters)
 # NB: that number of lines for logical comparisons is 6 and for all others is 1
@@ -29,7 +30,8 @@ sub new {
 	my $filename = shift;
 	
 	open(my $asmfile, ">", $filename . '.asm') or die $!;
-	
+	my ( $basename, $dir ) = fileparse($filename);
+
 	# initialise member variables here
 	my $self = {
 		_file => $asmfile,
@@ -37,7 +39,7 @@ sub new {
 		# the current line number & only increment it for a real instruction
 		_line_no => 0,
 		# this is needed for generating symbols for the static segment
-		_basename=>$filename,
+		_basename=>$basename,
 	};
 	
 	
@@ -265,8 +267,8 @@ sub _popd {
 		die "CodeWriter::_popd() incorrectly passed an argument";
 	}
 	
-	print {$self->{_file}} "  \@SP\n  M=M-1\n  A=M\n  D=M\n";
-	$self->{_line_no} += 4;
+	print {$self->{_file}} "  \@SP\n  AM=M-1\n  D=M\n";
+	$self->{_line_no} += 3;
 }
 
 # emit assembly commands to push D to stack

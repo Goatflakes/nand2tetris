@@ -2,16 +2,12 @@
 
 use strict;
 use warnings;
-use File::Basename;
 
 use Parser;
 use CodeWriter;
 
-
-my ( $file_base, $dir, $suffix ) = fileparse($ARGV[0], ('.vm'));
-
 my $parser = Parser->new( $ARGV[0] );
-my $writer = CodeWriter->new( $file_base );
+my $writer = CodeWriter->new( $ARGV[0] );
 
 while($parser->hasMoreCommands()) {
 	$parser->advance();

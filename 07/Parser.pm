@@ -13,9 +13,12 @@ sub new {
 
 	my $class = shift;
 	my $filename_vm = shift;
+	$filename_vm = $filename_vm . ".vm";
 	
 	# try to open the input .vm file
-	open(my $vmfile, "<", $filename_vm) or die $!;
+	# the tester passes the name of file sans the extension
+	open(my $vmfile, "<", $filename_vm)
+		or die "No such file $filename_vm at Parser.pm line 18.\n";
 	# close it cause we don't really need it, we just needed to check
 	close ( $vmfile ) or die $!;
 
@@ -25,7 +28,9 @@ sub new {
 	# Pass the original .vm file to the C Preprocessor to strip comments.
 	# because C style comments are a pain in the arse
 	# -P removes line numbers in cpp output
-	# 'and die' is used cause system returns 0 on success	
+	# 'and die' is used instead of 'or die' because the usual convention
+	# for excutables and therefore system is to return 0 on success, non
+	# zero for an error
 	system ( "cpp $filename_vm -P -o $filename_stripped" ) and die $!;
 
 	# Open the stripped vm language file to translate
